@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GameController;
+use App\Http\Controllers\GameReferenceController;
 use App\Http\Controllers\ListingController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\SearchTermController;
@@ -14,6 +15,9 @@ Route::inertia('/', 'welcome', [
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('catalog', [GameReferenceController::class, 'index'])->name('catalog.index');
+    Route::get('catalog/{gameReference}', [GameReferenceController::class, 'show'])->name('catalog.show');
 
     Route::get('games', [GameController::class, 'index'])->name('games.index');
     Route::get('games/export', [GameController::class, 'export'])->name('games.export');

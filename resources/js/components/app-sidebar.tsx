@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, Gamepad2, LayoutGrid, List, Search, Store } from 'lucide-react';
+import { BookOpen, FolderGit2, Gamepad2, Library, LayoutGrid, List, Search, Store } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,6 +14,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import catalog from '@/routes/catalog';
 import games from '@/routes/games';
 import listings from '@/routes/listings';
 import marketplaces from '@/routes/marketplaces';
@@ -25,6 +26,11 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Game Catalog',
+        href: catalog.index(),
+        icon: Library,
     },
     {
         title: 'Games',

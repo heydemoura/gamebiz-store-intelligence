@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'game_id', 'marketplace_id', 'external_id', 'title', 'price_cents',
+    'game_id', 'game_reference_id', 'marketplace_id', 'external_id', 'title', 'price_cents',
     'condition', 'seller_name', 'listing_url', 'image_url', 'is_available',
     'raw_data', 'first_seen_at', 'last_seen_at',
 ])]
@@ -41,6 +41,14 @@ class Listing extends Model
     public function game(): BelongsTo
     {
         return $this->belongsTo(Game::class);
+    }
+
+    /**
+     * @return BelongsTo<GameReference, $this>
+     */
+    public function gameReference(): BelongsTo
+    {
+        return $this->belongsTo(GameReference::class);
     }
 
     /**

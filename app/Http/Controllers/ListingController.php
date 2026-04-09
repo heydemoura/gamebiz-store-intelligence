@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\GameCondition;
 use App\Enums\Platform;
-use App\Models\Game;
+use App\Models\GameReference;
 use App\Models\Listing;
 use App\Models\Marketplace;
 use App\Models\Tag;
@@ -18,7 +18,7 @@ class ListingController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Listing::with(['game', 'marketplace', 'tags'])
+        $query = Listing::with(['game', 'gameReference', 'marketplace', 'tags'])
             ->where('is_available', true);
 
         if ($request->filled('search')) {
@@ -74,9 +74,11 @@ class ListingController extends Controller
             'listing_url' => $l->listing_url,
             'image_url' => $l->image_url,
             'marketplace' => $l->marketplace->name,
-            'game_title' => $l->game?->title,
+            'game_title' => $l->gameReference?->title ?? $l->game?->title,
             'game_id' => $l->game_id,
-            'game_platform' => $l->game?->platform->label(),
+            'game_reference_id' => $l->game_reference_id,
+            'game_reference_title' => $l->gameReference?->title,
+            'game_platform' => $l->gameReference?->platform->label() ?? $l->game?->platform->label(),
             'seller_name' => $l->seller_name,
             'is_available' => $l->is_available,
             'last_seen_at' => $l->last_seen_at->toDateTimeString(),
@@ -100,7 +102,7 @@ class ListingController extends Controller
                 'label' => $c->label(),
             ]),
             'tags' => Tag::orderBy('name')->get(['id', 'name', 'slug', 'color']),
-            'games' => Inertia::optional(fn () => Game::orderBy('title')->get(['id', 'title', 'platform'])->map(fn (Game $g) => [
+            'gameReferences' => Inertia::optional(fn () => GameReference::orderBy('title')->get(['id', 'title', 'platform'])->map(fn (GameReference $g) => [
                 'id' => $g->id,
                 'label' => $g->title.' ('.$g->platform->label().')',
             ])),
@@ -115,7 +117,7 @@ class ListingController extends Controller
             'price_cents' => ['required', 'integer', 'min:0'],
             'condition' => ['required', 'string'],
             'listing_url' => ['required', 'string', 'max:2048'],
-            'game_id' => ['nullable', 'integer', 'exists:games,id'],
+            'game_reference_id' => ['nullable', 'integer', 'exists:game_references,id'],
             'seller_name' => ['nullable', 'string', 'max:255'],
             'is_available' => ['required', 'boolean'],
         ]);

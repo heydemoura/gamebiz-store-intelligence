@@ -23,6 +23,8 @@ interface Listing {
     title: string;
     game_title: string;
     game_id: number | null;
+    game_reference_id: number | null;
+    game_reference_title: string | null;
     game_platform: string;
     price_cents: number;
     condition: string;
@@ -54,7 +56,7 @@ interface Props {
     platforms: Array<{ value: string; label: string }>;
     conditions: Array<{ value: string; label: string }>;
     tags: TagData[];
-    games?: Array<{ id: number; label: string }>;
+    gameReferences?: Array<{ id: number; label: string }>;
     filters: {
         search?: string;
         marketplace?: string;
@@ -75,7 +77,7 @@ interface EditForm {
     price_cents: number;
     condition: string;
     listing_url: string;
-    game_id: string;
+    game_reference_id: string;
     seller_name: string;
     is_available: boolean;
 }
@@ -86,7 +88,7 @@ export default function ListingsIndex({
     platforms,
     conditions,
     tags,
-    games,
+    gameReferences,
     filters,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
@@ -105,7 +107,7 @@ export default function ListingsIndex({
         price_cents: 0,
         condition: 'unknown',
         listing_url: '',
-        game_id: '',
+        game_reference_id: '',
         seller_name: '',
         is_available: true,
     });
@@ -174,13 +176,13 @@ export default function ListingsIndex({
             price_cents: listing.price_cents,
             condition: listing.condition,
             listing_url: listing.listing_url,
-            game_id: listing.game_id ? String(listing.game_id) : '',
+            game_reference_id: listing.game_reference_id ? String(listing.game_reference_id) : '',
             seller_name: listing.seller_name ?? '',
             is_available: listing.is_available,
         });
-        // Load games list if not already loaded (optional prop)
-        if (!games) {
-            router.reload({ only: ['games'] });
+        // Load game references list if not already loaded (optional prop)
+        if (!gameReferences) {
+            router.reload({ only: ['gameReferences'] });
         }
     }
 
@@ -194,7 +196,7 @@ export default function ListingsIndex({
                 price_cents: editForm.price_cents,
                 condition: editForm.condition,
                 listing_url: editForm.listing_url,
-                game_id: editForm.game_id ? Number(editForm.game_id) : null,
+                game_reference_id: editForm.game_reference_id ? Number(editForm.game_reference_id) : null,
                 seller_name: editForm.seller_name || null,
                 is_available: editForm.is_available,
             },
@@ -633,15 +635,15 @@ export default function ListingsIndex({
                         <div className="grid gap-2">
                             <Label>Game</Label>
                             <Select
-                                value={editForm.game_id || 'none'}
-                                onValueChange={(value) => setEditForm({ ...editForm, game_id: value === 'none' ? '' : value })}
+                                value={editForm.game_reference_id || 'none'}
+                                onValueChange={(value) => setEditForm({ ...editForm, game_reference_id: value === 'none' ? '' : value })}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a game..." />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">No game assigned</SelectItem>
-                                    {(games ?? []).map((g) => (
+                                    {(gameReferences ?? []).map((g) => (
                                         <SelectItem key={g.id} value={String(g.id)}>
                                             {g.label}
                                         </SelectItem>
