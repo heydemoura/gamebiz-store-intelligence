@@ -18,6 +18,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('catalog', [GameReferenceController::class, 'index'])->name('catalog.index');
     Route::get('catalog/{gameReference}', [GameReferenceController::class, 'show'])->name('catalog.show');
+    Route::post('catalog/{gameReference}/scrape', [GameReferenceController::class, 'scrape'])->name('catalog.scrape');
 
     Route::get('games', [GameController::class, 'index'])->name('games.index');
     Route::get('games/export', [GameController::class, 'export'])->name('games.export');

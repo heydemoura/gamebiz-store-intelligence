@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Platform;
+use App\Jobs\ScrapeMarketplace;
 use App\Models\GameReference;
 use App\Models\Listing;
+use App\Models\Marketplace;
 use App\Models\PriceSnapshot;
+use App\Services\Scrapers\ScraperManager;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -111,6 +115,16 @@ class GameReferenceController extends Controller
                 'max_price' => (int) $row->max_price,
             ]);
 
+        $scraperManager = app(ScraperManager::class);
+        $marketplaces = Marketplace::where('is_active', true)
+            ->get()
+            ->filter(fn (Marketplace $mp) => $scraperManager->has($mp->slug))
+            ->map(fn (Marketplace $mp) => [
+                'id' => $mp->id,
+                'name' => $mp->name,
+                'slug' => $mp->slug,
+            ])->values();
+
         return Inertia::render('catalog/show', [
             'game' => [
                 'id' => $gameReference->id,
@@ -127,6 +141,25 @@ class GameReferenceController extends Controller
             'listings' => $listings,
             'priceStats' => $priceStats,
             'priceHistory' => $priceHistory,
+            'marketplaces' => $marketplaces,
         ]);
+    }
+
+    public function scrape(Request $request, GameReference $gameReference): RedirectResponse
+    {
+        $validated = $request->validate([
+            'marketplace_id' => ['required', 'exists:marketplaces,id'],
+        ]);
+
+        $marketplace = Marketplace::findOrFail($validated['marketplace_id']);
+
+        dispatch(new ScrapeMarketplace($marketplace, $gameReference->title));
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => "Scraping \"{$gameReference->title}\" on {$marketplace->name}. Results will appear shortly.",
+        ]);
+
+        return back();
     }
 }

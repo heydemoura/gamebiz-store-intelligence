@@ -1,9 +1,12 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { dashboard } from '@/routes';
 import catalog from '@/routes/catalog';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Radar } from 'lucide-react';
+import { useState } from 'react';
 import {
     ResponsiveContainer,
     LineChart,
@@ -62,18 +65,42 @@ interface PriceHistoryPoint {
     max_price: number;
 }
 
+interface MarketplaceOption {
+    id: number;
+    name: string;
+    slug: string;
+}
+
 interface Props {
     game: GameRef;
     listings: Listing[];
     priceStats: PriceStats;
     priceHistory: PriceHistoryPoint[];
+    marketplaces: MarketplaceOption[];
 }
 
 function formatPrice(cents: number): string {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export default function CatalogShow({ game, listings, priceStats, priceHistory }: Props) {
+export default function CatalogShow({ game, listings, priceStats, priceHistory, marketplaces }: Props) {
+    const [selectedMarketplace, setSelectedMarketplace] = useState('');
+    const [scraping, setScraping] = useState(false);
+
+    function triggerScrape() {
+        if (!selectedMarketplace) return;
+        setScraping(true);
+        router.post(
+            catalog.scrape.url(game.id),
+            { marketplace_id: Number(selectedMarketplace) },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onFinish: () => setScraping(false),
+            },
+        );
+    }
+
     const chartData = priceHistory.map((point) => ({
         date: point.date,
         avg: point.avg_price / 100,
@@ -116,6 +143,30 @@ export default function CatalogShow({ game, listings, priceStats, priceHistory }
                             </a>
                         )}
                     </div>
+                    {marketplaces.length > 0 && (
+                        <div className="mt-3 flex items-center gap-2">
+                            <Select value={selectedMarketplace} onValueChange={setSelectedMarketplace}>
+                                <SelectTrigger className="w-52">
+                                    <SelectValue placeholder="Choose marketplace..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {marketplaces.map((mp) => (
+                                        <SelectItem key={mp.id} value={String(mp.id)}>
+                                            {mp.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Button
+                                size="sm"
+                                onClick={triggerScrape}
+                                disabled={!selectedMarketplace || scraping}
+                            >
+                                <Radar className="size-4" />
+                                {scraping ? 'Scraping...' : 'Scrape'}
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {priceStats.count > 0 && (
