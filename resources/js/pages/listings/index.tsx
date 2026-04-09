@@ -1,11 +1,13 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Toggle } from '@/components/ui/toggle';
 import { dashboard } from '@/routes';
 import listingsRoute from '@/routes/listings';
-import { Download, ExternalLink, Tag } from 'lucide-react';
+import { Download, ExternalLink, MonitorPlay, Tag } from 'lucide-react';
 import { useState } from 'react';
 
 interface TagData {
@@ -78,6 +80,8 @@ export default function ListingsIndex({
     const [priceMax, setPriceMax] = useState(filters.max_price ?? '');
     const [tagFilter, setTagFilter] = useState(filters.tag ?? '');
     const [openTagMenuId, setOpenTagMenuId] = useState<number | null>(null);
+    const [previewInline, setPreviewInline] = useState(false);
+    const [previewListing, setPreviewListing] = useState<Listing | null>(null);
 
     function applyFilters(newFilters: Record<string, string>) {
         const merged = { ...filters, ...newFilters };
@@ -101,6 +105,20 @@ export default function ListingsIndex({
     }
 
     function toggleTag(listingId: number, tagId: number) {
+        // Optimistically update the preview listing if it's the one being tagged
+        if (previewListing && previewListing.id === listingId) {
+            const tag = tags.find((t) => t.id === tagId);
+            if (tag) {
+                const hasCurrent = previewListing.tags.some((t) => t.id === tagId);
+                setPreviewListing({
+                    ...previewListing,
+                    tags: hasCurrent
+                        ? previewListing.tags.filter((t) => t.id !== tagId)
+                        : [...previewListing.tags, tag],
+                });
+            }
+        }
+
         router.post(
             listingsRoute.toggleTag.url({ listing: listingId, tag: tagId }),
             {},
@@ -112,6 +130,17 @@ export default function ListingsIndex({
     function hasTag(listing: Listing, tagId: number): boolean {
         return listing.tags.some((t) => t.id === tagId);
     }
+
+    function openListing(listing: Listing) {
+        if (previewInline) {
+            setPreviewListing(listing);
+        } else {
+            window.open(listing.listing_url, '_blank', 'noopener,noreferrer');
+        }
+    }
+
+    // Use the local previewListing state directly — it's optimistically updated on tag toggle
+    const activePreview = previewListing;
 
     return (
         <>
@@ -230,6 +259,16 @@ export default function ListingsIndex({
                             Export
                         </Button>
                     </a>
+                    <Toggle
+                        variant="outline"
+                        size="sm"
+                        pressed={previewInline}
+                        onPressedChange={setPreviewInline}
+                        title={previewInline ? 'Preview: inline (click to switch to new tab)' : 'Preview: new tab (click to switch to inline)'}
+                    >
+                        <MonitorPlay className="size-4" />
+                        Inline Preview
+                    </Toggle>
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border">
@@ -309,14 +348,17 @@ export default function ListingsIndex({
                                     </td>
                                     <td className="px-4 py-3 text-muted-foreground">{listing.last_seen_at}</td>
                                     <td className="px-4 py-3">
-                                        <a
-                                            href={listing.listing_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
+                                        <button
+                                            onClick={() => openListing(listing)}
                                             className="inline-flex items-center gap-1 text-primary hover:underline"
+                                            title={previewInline ? 'Open inline preview' : 'Open in new tab'}
                                         >
-                                            <ExternalLink className="size-3.5" />
-                                        </a>
+                                            {previewInline ? (
+                                                <MonitorPlay className="size-3.5" />
+                                            ) : (
+                                                <ExternalLink className="size-3.5" />
+                                            )}
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -351,6 +393,104 @@ export default function ListingsIndex({
                     </div>
                 )}
             </div>
+
+            <Dialog open={activePreview !== null} onOpenChange={(open) => { if (!open) setPreviewListing(null); }}>
+                <DialogContent className="flex h-[90vh] w-[90vw] max-w-[90vw] sm:max-w-[90vw] flex-col gap-0 overflow-hidden p-0">
+                    <DialogHeader className="shrink-0 border-b px-6 py-4">
+                        <DialogTitle className="flex items-center gap-2 pr-8">
+                            <span className="truncate">{activePreview?.title}</span>
+                            <a
+                                href={activePreview?.listing_url ?? '#'}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="shrink-0 text-muted-foreground hover:text-primary"
+                                title="Open in new tab"
+                            >
+                                <ExternalLink className="size-4" />
+                            </a>
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    {activePreview && (
+                        <div className="shrink-0 border-b px-6 py-4">
+                            <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span className="text-muted-foreground">Price:</span>
+                                    <span className="font-semibold">{formatPrice(activePreview.price_cents)}</span>
+                                </div>
+                                {activePreview.game_title && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span className="text-muted-foreground">Game:</span>
+                                        <span>{activePreview.game_title}</span>
+                                    </div>
+                                )}
+                                {activePreview.game_platform && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <span className="text-muted-foreground">Platform:</span>
+                                        <Badge variant="secondary">{activePreview.game_platform}</Badge>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span className="text-muted-foreground">Condition:</span>
+                                    <Badge variant="outline">{activePreview.condition_label}</Badge>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span className="text-muted-foreground">Marketplace:</span>
+                                    <span>{activePreview.marketplace}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm">
+                                    <span className="text-muted-foreground">Last Seen:</span>
+                                    <span className="text-muted-foreground">{activePreview.last_seen_at}</span>
+                                </div>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                                <span className="mr-1 text-sm text-muted-foreground">Tags:</span>
+                                {activePreview.tags.map((t) => (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => toggleTag(activePreview.id, t.id)}
+                                        className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
+                                        style={{ backgroundColor: t.color }}
+                                        title={`Remove "${t.name}"`}
+                                    >
+                                        {t.name}
+                                        <span className="ml-1">&times;</span>
+                                    </button>
+                                ))}
+                                {tags
+                                    .filter((t) => !hasTag(activePreview, t.id))
+                                    .map((t) => (
+                                        <button
+                                            key={t.id}
+                                            onClick={() => toggleTag(activePreview.id, t.id)}
+                                            className="inline-flex items-center gap-1 rounded-full border border-dashed px-2.5 py-0.5 text-xs text-muted-foreground transition-colors hover:border-current"
+                                            style={{ borderColor: t.color, color: t.color }}
+                                            title={`Add "${t.name}"`}
+                                        >
+                                            <span
+                                                className="inline-block size-2 rounded-full"
+                                                style={{ backgroundColor: t.color }}
+                                            />
+                                            {t.name}
+                                        </button>
+                                    ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="min-h-0 flex-1 p-6">
+                        {activePreview && (
+                            <iframe
+                                src={activePreview.listing_url}
+                                className="size-full rounded-md border"
+                                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                                referrerPolicy="no-referrer"
+                            />
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
