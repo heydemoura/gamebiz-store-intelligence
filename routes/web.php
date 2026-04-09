@@ -21,6 +21,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('listings', [ListingController::class, 'index'])->name('listings.index');
     Route::get('listings/export', [ListingController::class, 'export'])->name('listings.export');
+    Route::post('listings/{listing}/tags/{tag}', [ListingController::class, 'toggleTag'])->name('listings.toggle-tag');
 
     Route::get('marketplaces', [MarketplaceController::class, 'index'])->name('marketplaces.index');
     Route::patch('marketplaces/{marketplace}', [MarketplaceController::class, 'toggleActive'])->name('marketplaces.toggle');

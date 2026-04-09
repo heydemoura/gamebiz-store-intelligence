@@ -6,6 +6,8 @@ use App\Enums\GameCondition;
 use App\Enums\Platform;
 use App\Models\Listing;
 use App\Models\Marketplace;
+use App\Models\Tag;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -15,11 +17,11 @@ class ListingController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Listing::with(['game', 'marketplace'])
+        $query = Listing::with(['game', 'marketplace', 'tags'])
             ->where('is_available', true);
 
         if ($request->filled('search')) {
-            $query->where('title', 'like', '%' . $request->input('search') . '%');
+            $query->where('title', 'like', '%'.$request->input('search').'%');
         }
 
         if ($request->filled('marketplace')) {
@@ -42,6 +44,14 @@ class ListingController extends Controller
 
         if ($request->filled('max_price')) {
             $query->where('price_cents', '<=', (int) $request->input('max_price') * 100);
+        }
+
+        if ($request->input('tag') === 'untagged') {
+            $query->whereDoesntHave('tags');
+        } elseif ($request->filled('tag')) {
+            $query->whereHas('tags', function ($q) use ($request) {
+                $q->where('tags.slug', $request->input('tag'));
+            });
         }
 
         $sortField = $request->input('sort', 'last_seen_at');
@@ -68,6 +78,12 @@ class ListingController extends Controller
             'game_platform' => $l->game?->platform->label(),
             'seller_name' => $l->seller_name,
             'last_seen_at' => $l->last_seen_at->toDateTimeString(),
+            'tags' => $l->tags->map(fn (Tag $t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'slug' => $t->slug,
+                'color' => $t->color,
+            ])->values()->all(),
         ]);
 
         return Inertia::render('listings/index', [
@@ -81,13 +97,21 @@ class ListingController extends Controller
                 'value' => $c->value,
                 'label' => $c->label(),
             ]),
-            'filters' => $request->only(['search', 'marketplace', 'condition', 'platform', 'min_price', 'max_price', 'sort', 'direction']),
+            'tags' => Tag::orderBy('name')->get(['id', 'name', 'slug', 'color']),
+            'filters' => $request->only(['search', 'marketplace', 'condition', 'platform', 'min_price', 'max_price', 'sort', 'direction', 'tag']),
         ]);
+    }
+
+    public function toggleTag(Listing $listing, Tag $tag): RedirectResponse
+    {
+        $listing->tags()->toggle($tag->id);
+
+        return back();
     }
 
     public function export(Request $request): StreamedResponse
     {
-        $query = Listing::with(['game', 'marketplace'])
+        $query = Listing::with(['game', 'marketplace', 'tags'])
             ->where('is_available', true)
             ->orderBy('price_cents');
 
@@ -103,7 +127,7 @@ class ListingController extends Controller
 
         return response()->streamDownload(function () use ($query) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Title', 'Game', 'Platform', 'Price (BRL)', 'Condition', 'Marketplace', 'Seller', 'URL', 'Last Seen']);
+            fputcsv($handle, ['Title', 'Game', 'Platform', 'Price (BRL)', 'Condition', 'Marketplace', 'Seller', 'Tags', 'URL', 'Last Seen']);
 
             $query->chunk(100, function ($listings) use ($handle) {
                 foreach ($listings as $listing) {
@@ -115,6 +139,7 @@ class ListingController extends Controller
                         $listing->condition->label(),
                         $listing->marketplace->name,
                         $listing->seller_name ?? '',
+                        $listing->tags->pluck('name')->implode(', '),
                         $listing->listing_url,
                         $listing->last_seen_at->toDateTimeString(),
                     ]);
@@ -122,6 +147,6 @@ class ListingController extends Controller
             });
 
             fclose($handle);
-        }, 'listings-export-' . date('Y-m-d') . '.csv');
+        }, 'listings-export-'.date('Y-m-d').'.csv');
     }
 }

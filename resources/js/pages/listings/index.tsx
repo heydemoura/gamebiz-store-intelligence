@@ -1,24 +1,31 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { dashboard } from '@/routes';
-import listings from '@/routes/listings';
-import { Download, ExternalLink } from 'lucide-react';
+import listingsRoute from '@/routes/listings';
+import { Download, ExternalLink, Tag } from 'lucide-react';
 import { useState } from 'react';
+
+interface TagData {
+    id: number;
+    name: string;
+    slug: string;
+    color: string;
+}
 
 interface Listing {
     id: number;
     title: string;
     game_title: string;
-    platform_label: string;
+    game_platform: string;
     price_cents: number;
     condition_label: string;
     marketplace: string;
     listing_url: string;
     last_seen_at: string;
+    tags: TagData[];
 }
 
 interface PaginationLink {
@@ -39,13 +46,15 @@ interface Props {
     marketplaces: Array<{ id: number; name: string }>;
     platforms: Array<{ value: string; label: string }>;
     conditions: Array<{ value: string; label: string }>;
+    tags: TagData[];
     filters: {
         search?: string;
         marketplace?: string;
         condition?: string;
         platform?: string;
-        price_min?: string;
-        price_max?: string;
+        min_price?: string;
+        max_price?: string;
+        tag?: string;
     };
 }
 
@@ -58,21 +67,24 @@ export default function ListingsIndex({
     marketplaces,
     platforms,
     conditions,
+    tags,
     filters,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [marketplace, setMarketplace] = useState(filters.marketplace ?? '');
     const [condition, setCondition] = useState(filters.condition ?? '');
     const [platform, setPlatform] = useState(filters.platform ?? '');
-    const [priceMin, setPriceMin] = useState(filters.price_min ?? '');
-    const [priceMax, setPriceMax] = useState(filters.price_max ?? '');
+    const [priceMin, setPriceMin] = useState(filters.min_price ?? '');
+    const [priceMax, setPriceMax] = useState(filters.max_price ?? '');
+    const [tagFilter, setTagFilter] = useState(filters.tag ?? '');
+    const [openTagMenuId, setOpenTagMenuId] = useState<number | null>(null);
 
     function applyFilters(newFilters: Record<string, string>) {
         const merged = { ...filters, ...newFilters };
         const cleaned = Object.fromEntries(
             Object.entries(merged).filter(([, v]) => v !== '' && v !== undefined),
         );
-        router.get(listings.index.url(), cleaned, { preserveState: true });
+        router.get(listingsRoute.index.url(), cleaned, { preserveState: true });
     }
 
     function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -85,7 +97,20 @@ export default function ListingsIndex({
         const params = Object.fromEntries(
             Object.entries(filters).filter(([, v]) => v !== '' && v !== undefined),
         );
-        return listings.export.url({ query: params });
+        return listingsRoute.export.url({ query: params });
+    }
+
+    function toggleTag(listingId: number, tagId: number) {
+        router.post(
+            listingsRoute.toggleTag.url({ listing: listingId, tag: tagId }),
+            {},
+            { preserveState: true, preserveScroll: true },
+        );
+        setOpenTagMenuId(null);
+    }
+
+    function hasTag(listing: Listing, tagId: number): boolean {
+        return listing.tags.some((t) => t.id === tagId);
     }
 
     return (
@@ -157,12 +182,38 @@ export default function ListingsIndex({
                             ))}
                         </SelectContent>
                     </Select>
+                    <Select
+                        value={tagFilter}
+                        onValueChange={(value) => {
+                            setTagFilter(value);
+                            applyFilters({ tag: value === 'all' ? '' : value });
+                        }}
+                    >
+                        <SelectTrigger className="w-48">
+                            <SelectValue placeholder="All Tags" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Tags</SelectItem>
+                            <SelectItem value="untagged">Untagged</SelectItem>
+                            {tags.map((t) => (
+                                <SelectItem key={t.slug} value={t.slug}>
+                                    <span className="flex items-center gap-2">
+                                        <span
+                                            className="inline-block size-2.5 rounded-full"
+                                            style={{ backgroundColor: t.color }}
+                                        />
+                                        {t.name}
+                                    </span>
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Input
                         type="number"
                         placeholder="Min price"
                         value={priceMin}
                         onChange={(e) => setPriceMin(e.target.value)}
-                        onBlur={() => applyFilters({ price_min: priceMin })}
+                        onBlur={() => applyFilters({ min_price: priceMin })}
                         className="w-28"
                     />
                     <Input
@@ -170,7 +221,7 @@ export default function ListingsIndex({
                         placeholder="Max price"
                         value={priceMax}
                         onChange={(e) => setPriceMax(e.target.value)}
-                        onBlur={() => applyFilters({ price_max: priceMax })}
+                        onBlur={() => applyFilters({ max_price: priceMax })}
                         className="w-28"
                     />
                     <a href={exportUrl()}>
@@ -191,6 +242,7 @@ export default function ListingsIndex({
                                 <th className="px-4 py-3 font-medium">Price</th>
                                 <th className="px-4 py-3 font-medium">Condition</th>
                                 <th className="px-4 py-3 font-medium">Marketplace</th>
+                                <th className="px-4 py-3 font-medium">Tags</th>
                                 <th className="px-4 py-3 font-medium">Last Seen</th>
                                 <th className="px-4 py-3 font-medium"></th>
                             </tr>
@@ -201,13 +253,60 @@ export default function ListingsIndex({
                                     <td className="px-4 py-3 font-medium">{listing.title}</td>
                                     <td className="px-4 py-3">{listing.game_title}</td>
                                     <td className="px-4 py-3">
-                                        <Badge variant="secondary">{listing.platform_label}</Badge>
+                                        {listing.game_platform && (
+                                            <Badge variant="secondary">{listing.game_platform}</Badge>
+                                        )}
                                     </td>
                                     <td className="px-4 py-3 font-medium">{formatPrice(listing.price_cents)}</td>
                                     <td className="px-4 py-3">
                                         <Badge variant="outline">{listing.condition_label}</Badge>
                                     </td>
                                     <td className="px-4 py-3">{listing.marketplace}</td>
+                                    <td className="px-4 py-3">
+                                        <div className="relative flex flex-wrap items-center gap-1">
+                                            {listing.tags.map((t) => (
+                                                <button
+                                                    key={t.id}
+                                                    onClick={() => toggleTag(listing.id, t.id)}
+                                                    className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
+                                                    style={{ backgroundColor: t.color }}
+                                                    title={`Remove "${t.name}"`}
+                                                >
+                                                    {t.name}
+                                                    <span className="ml-1">&times;</span>
+                                                </button>
+                                            ))}
+                                            <button
+                                                onClick={() =>
+                                                    setOpenTagMenuId(openTagMenuId === listing.id ? null : listing.id)
+                                                }
+                                                className="inline-flex items-center rounded-full border border-dashed px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                                                title="Add tag"
+                                            >
+                                                <Tag className="size-3" />
+                                            </button>
+                                            {openTagMenuId === listing.id && (
+                                                <div className="absolute top-full left-0 z-10 mt-1 rounded-md border bg-popover p-1 shadow-md">
+                                                    {tags.map((t) => (
+                                                        <button
+                                                            key={t.id}
+                                                            onClick={() => toggleTag(listing.id, t.id)}
+                                                            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+                                                        >
+                                                            <span
+                                                                className="inline-block size-2.5 rounded-full"
+                                                                style={{ backgroundColor: t.color }}
+                                                            />
+                                                            {t.name}
+                                                            {hasTag(listing, t.id) && (
+                                                                <span className="ml-auto text-primary">&#10003;</span>
+                                                            )}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className="px-4 py-3 text-muted-foreground">{listing.last_seen_at}</td>
                                     <td className="px-4 py-3">
                                         <a
@@ -223,7 +322,7 @@ export default function ListingsIndex({
                             ))}
                             {paginatedListings.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                                    <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
                                         No listings found.
                                     </td>
                                 </tr>
@@ -259,6 +358,6 @@ export default function ListingsIndex({
 ListingsIndex.layout = {
     breadcrumbs: [
         { title: 'Dashboard', href: dashboard() },
-        { title: 'Listings', href: listings.index() },
+        { title: 'Listings', href: listingsRoute.index() },
     ],
 };

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Marketplace;
 use App\Models\SearchTerm;
+use App\Models\Tag;
 use Illuminate\Database\Seeder;
 
 class MarketplaceSeeder extends Seeder
@@ -77,6 +78,22 @@ class MarketplaceSeeder extends Seeder
             SearchTerm::updateOrCreate(
                 ['term' => $term['term']],
                 $term,
+            );
+        }
+
+        $tags = [
+            ['name' => 'Scam', 'slug' => 'scam', 'color' => '#ef4444'],
+            ['name' => 'Good Deal', 'slug' => 'good-deal', 'color' => '#22c55e'],
+            ['name' => 'Needs Repair', 'slug' => 'needs-repair', 'color' => '#f59e0b'],
+            ['name' => 'Overpriced', 'slug' => 'overpriced', 'color' => '#f97316'],
+            ['name' => 'Fully Working', 'slug' => 'fully-working', 'color' => '#3b82f6'],
+            ['name' => 'Complete with Accessories', 'slug' => 'complete-with-accessories', 'color' => '#8b5cf6'],
+        ];
+
+        foreach ($tags as $tag) {
+            Tag::updateOrCreate(
+                ['slug' => $tag['slug']],
+                $tag,
             );
         }
     }
