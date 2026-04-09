@@ -36,7 +36,7 @@ class ScrapeMarketplace implements ShouldBeUnique, ShouldQueue
 
     public function uniqueId(): string
     {
-        return $this->marketplace->slug . '-' . Str::slug($this->searchTerm);
+        return $this->marketplace->slug.'-'.Str::slug($this->searchTerm);
     }
 
     public function handle(ScraperManager $scraperManager): void
@@ -138,7 +138,7 @@ class ScrapeMarketplace implements ShouldBeUnique, ShouldQueue
             return null;
         }
 
-        $slug = Str::slug($normalized . '-' . $platform->value);
+        $slug = Str::slug($normalized.'-'.$platform->value);
 
         if (empty($slug)) {
             return null;
@@ -162,7 +162,7 @@ class ScrapeMarketplace implements ShouldBeUnique, ShouldQueue
         // Remove platform suffixes (use word boundaries safe for multibyte)
         $platforms = ['playstation 5', 'playstation 4', 'playstation 3', 'ps3', 'ps4', 'ps5', 'xbox 360', 'xbox one', 'xbox series', 'nintendo switch', 'switch', '3ds', 'ds', 'wii u', 'wii', 'pc', 'gbc', 'gba'];
         foreach ($platforms as $platform) {
-            $normalized = preg_replace('/(?<=\s|^)' . preg_quote($platform, '/') . '(?=\s|$|-|,|\.|\/)/iu', '', $normalized) ?? $normalized;
+            $normalized = preg_replace('/(?<=\s|^)'.preg_quote($platform, '/').'(?=\s|$|-|,|\.|\/)/iu', '', $normalized) ?? $normalized;
         }
 
         // Remove common noise words
@@ -195,9 +195,11 @@ class ScrapeMarketplace implements ShouldBeUnique, ShouldQueue
             'playstation 4' => Platform::Ps4,
             'ps3' => Platform::Ps3,
             'playstation 3' => Platform::Ps3,
+            'ps2' => Platform::Ps2,
+            'playstation 2' => Platform::Ps2,
             'xbox series' => Platform::XboxSeries,
             'xbox one' => Platform::XboxOne,
-            'xbox 360' => Platform::XboxOne,
+            'xbox 360' => Platform::Xbox360,
             'switch' => Platform::Switch,
             'nintendo switch' => Platform::Switch,
             '3ds' => Platform::Ds3,

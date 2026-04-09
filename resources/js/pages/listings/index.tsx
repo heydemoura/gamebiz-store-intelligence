@@ -1,13 +1,14 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Toggle } from '@/components/ui/toggle';
 import { dashboard } from '@/routes';
 import listingsRoute from '@/routes/listings';
-import { Download, ExternalLink, MonitorPlay, Tag } from 'lucide-react';
+import { Download, ExternalLink, MonitorPlay, Pencil, Tag } from 'lucide-react';
 import { useState } from 'react';
 
 interface TagData {
@@ -21,11 +22,15 @@ interface Listing {
     id: number;
     title: string;
     game_title: string;
+    game_id: number | null;
     game_platform: string;
     price_cents: number;
+    condition: string;
     condition_label: string;
     marketplace: string;
     listing_url: string;
+    seller_name: string | null;
+    is_available: boolean;
     last_seen_at: string;
     tags: TagData[];
 }
@@ -49,6 +54,7 @@ interface Props {
     platforms: Array<{ value: string; label: string }>;
     conditions: Array<{ value: string; label: string }>;
     tags: TagData[];
+    games?: Array<{ id: number; label: string }>;
     filters: {
         search?: string;
         marketplace?: string;
@@ -64,12 +70,23 @@ function formatPrice(cents: number): string {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+interface EditForm {
+    title: string;
+    price_cents: number;
+    condition: string;
+    listing_url: string;
+    game_id: string;
+    seller_name: string;
+    is_available: boolean;
+}
+
 export default function ListingsIndex({
     listings: paginatedListings,
     marketplaces,
     platforms,
     conditions,
     tags,
+    games,
     filters,
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
@@ -82,6 +99,17 @@ export default function ListingsIndex({
     const [openTagMenuId, setOpenTagMenuId] = useState<number | null>(null);
     const [previewInline, setPreviewInline] = useState(false);
     const [previewListing, setPreviewListing] = useState<Listing | null>(null);
+    const [editListing, setEditListing] = useState<Listing | null>(null);
+    const [editForm, setEditForm] = useState<EditForm>({
+        title: '',
+        price_cents: 0,
+        condition: 'unknown',
+        listing_url: '',
+        game_id: '',
+        seller_name: '',
+        is_available: true,
+    });
+    const [editSaving, setEditSaving] = useState(false);
 
     function applyFilters(newFilters: Record<string, string>) {
         const merged = { ...filters, ...newFilters };
@@ -137,6 +165,49 @@ export default function ListingsIndex({
         } else {
             window.open(listing.listing_url, '_blank', 'noopener,noreferrer');
         }
+    }
+
+    function openEdit(listing: Listing) {
+        setEditListing(listing);
+        setEditForm({
+            title: listing.title,
+            price_cents: listing.price_cents,
+            condition: listing.condition,
+            listing_url: listing.listing_url,
+            game_id: listing.game_id ? String(listing.game_id) : '',
+            seller_name: listing.seller_name ?? '',
+            is_available: listing.is_available,
+        });
+        // Load games list if not already loaded (optional prop)
+        if (!games) {
+            router.reload({ only: ['games'] });
+        }
+    }
+
+    function saveEdit() {
+        if (!editListing) return;
+        setEditSaving(true);
+        router.patch(
+            listingsRoute.update.url(editListing.id),
+            {
+                title: editForm.title,
+                price_cents: editForm.price_cents,
+                condition: editForm.condition,
+                listing_url: editForm.listing_url,
+                game_id: editForm.game_id ? Number(editForm.game_id) : null,
+                seller_name: editForm.seller_name || null,
+                is_available: editForm.is_available,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onSuccess: () => {
+                    setEditListing(null);
+                    setEditSaving(false);
+                },
+                onError: () => setEditSaving(false),
+            },
+        );
     }
 
     // Use the local previewListing state directly — it's optimistically updated on tag toggle
@@ -348,17 +419,26 @@ export default function ListingsIndex({
                                     </td>
                                     <td className="px-4 py-3 text-muted-foreground">{listing.last_seen_at}</td>
                                     <td className="px-4 py-3">
-                                        <button
-                                            onClick={() => openListing(listing)}
-                                            className="inline-flex items-center gap-1 text-primary hover:underline"
-                                            title={previewInline ? 'Open inline preview' : 'Open in new tab'}
-                                        >
-                                            {previewInline ? (
-                                                <MonitorPlay className="size-3.5" />
-                                            ) : (
-                                                <ExternalLink className="size-3.5" />
-                                            )}
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => openEdit(listing)}
+                                                className="text-muted-foreground hover:text-primary"
+                                                title="Edit listing"
+                                            >
+                                                <Pencil className="size-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => openListing(listing)}
+                                                className="text-primary hover:underline"
+                                                title={previewInline ? 'Open inline preview' : 'Open in new tab'}
+                                            >
+                                                {previewInline ? (
+                                                    <MonitorPlay className="size-3.5" />
+                                                ) : (
+                                                    <ExternalLink className="size-3.5" />
+                                                )}
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -399,6 +479,15 @@ export default function ListingsIndex({
                     <DialogHeader className="shrink-0 border-b px-6 py-4">
                         <DialogTitle className="flex items-center gap-2 pr-8">
                             <span className="truncate">{activePreview?.title}</span>
+                            {activePreview && (
+                                <button
+                                    onClick={() => openEdit(activePreview)}
+                                    className="shrink-0 text-muted-foreground hover:text-primary"
+                                    title="Edit listing"
+                                >
+                                    <Pencil className="size-4" />
+                                </button>
+                            )}
                             <a
                                 href={activePreview?.listing_url ?? '#'}
                                 target="_blank"
@@ -489,6 +578,112 @@ export default function ListingsIndex({
                             />
                         )}
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={editListing !== null} onOpenChange={(open) => { if (!open) setEditListing(null); }}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Edit Listing</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-2">
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-title">Title</Label>
+                            <Input
+                                id="edit-title"
+                                value={editForm.title}
+                                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-price">Price (BRL)</Label>
+                                <Input
+                                    id="edit-price"
+                                    type="number"
+                                    step="0.01"
+                                    value={(editForm.price_cents / 100).toFixed(2)}
+                                    onChange={(e) =>
+                                        setEditForm({
+                                            ...editForm,
+                                            price_cents: Math.round(parseFloat(e.target.value || '0') * 100),
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>Condition</Label>
+                                <Select
+                                    value={editForm.condition}
+                                    onValueChange={(value) => setEditForm({ ...editForm, condition: value })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {conditions.map((c) => (
+                                            <SelectItem key={c.value} value={c.value}>
+                                                {c.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Game</Label>
+                            <Select
+                                value={editForm.game_id || 'none'}
+                                onValueChange={(value) => setEditForm({ ...editForm, game_id: value === 'none' ? '' : value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a game..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">No game assigned</SelectItem>
+                                    {(games ?? []).map((g) => (
+                                        <SelectItem key={g.id} value={String(g.id)}>
+                                            {g.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-url">Listing URL</Label>
+                            <Input
+                                id="edit-url"
+                                value={editForm.listing_url}
+                                onChange={(e) => setEditForm({ ...editForm, listing_url: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-seller">Seller Name</Label>
+                            <Input
+                                id="edit-seller"
+                                value={editForm.seller_name}
+                                onChange={(e) => setEditForm({ ...editForm, seller_name: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                id="edit-available"
+                                type="checkbox"
+                                checked={editForm.is_available}
+                                onChange={(e) => setEditForm({ ...editForm, is_available: e.target.checked })}
+                                className="size-4 rounded border-input"
+                            />
+                            <Label htmlFor="edit-available">Available</Label>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditListing(null)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={saveEdit} disabled={editSaving}>
+                            {editSaving ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>

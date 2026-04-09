@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\GameCondition;
 use App\Enums\Platform;
+use App\Models\Game;
 use App\Models\Listing;
 use App\Models\Marketplace;
 use App\Models\Tag;
@@ -77,6 +78,7 @@ class ListingController extends Controller
             'game_id' => $l->game_id,
             'game_platform' => $l->game?->platform->label(),
             'seller_name' => $l->seller_name,
+            'is_available' => $l->is_available,
             'last_seen_at' => $l->last_seen_at->toDateTimeString(),
             'tags' => $l->tags->map(fn (Tag $t) => [
                 'id' => $t->id,
@@ -98,8 +100,31 @@ class ListingController extends Controller
                 'label' => $c->label(),
             ]),
             'tags' => Tag::orderBy('name')->get(['id', 'name', 'slug', 'color']),
+            'games' => Inertia::optional(fn () => Game::orderBy('title')->get(['id', 'title', 'platform'])->map(fn (Game $g) => [
+                'id' => $g->id,
+                'label' => $g->title.' ('.$g->platform->label().')',
+            ])),
             'filters' => $request->only(['search', 'marketplace', 'condition', 'platform', 'min_price', 'max_price', 'sort', 'direction', 'tag']),
         ]);
+    }
+
+    public function update(Request $request, Listing $listing): RedirectResponse
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'price_cents' => ['required', 'integer', 'min:0'],
+            'condition' => ['required', 'string'],
+            'listing_url' => ['required', 'string', 'max:2048'],
+            'game_id' => ['nullable', 'integer', 'exists:games,id'],
+            'seller_name' => ['nullable', 'string', 'max:255'],
+            'is_available' => ['required', 'boolean'],
+        ]);
+
+        $listing->update($validated);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Listing updated.']);
+
+        return back();
     }
 
     public function toggleTag(Listing $listing, Tag $tag): RedirectResponse

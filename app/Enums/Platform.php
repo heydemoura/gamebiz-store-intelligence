@@ -4,11 +4,13 @@ namespace App\Enums;
 
 enum Platform: string
 {
+    case Ps2 = 'ps2';
     case Ps3 = 'ps3';
     case Ps4 = 'ps4';
     case Ps5 = 'ps5';
     case XboxOne = 'xbox_one';
     case XboxSeries = 'xbox_series';
+    case Xbox360 = 'xbox_360';
     case Switch = 'switch';
     case Pc = 'pc';
     case Ds3 = '3ds';
@@ -17,11 +19,13 @@ enum Platform: string
     public function label(): string
     {
         return match ($this) {
+            self::Ps2 => 'PS2',
             self::Ps3 => 'PS3',
             self::Ps4 => 'PS4',
             self::Ps5 => 'PS5',
             self::XboxOne => 'Xbox One',
             self::XboxSeries => 'Xbox Series',
+            self::Xbox360 => 'Xbox 360',
             self::Switch => 'Nintendo Switch',
             self::Pc => 'PC',
             self::Ds3 => 'Nintendo 3DS',
