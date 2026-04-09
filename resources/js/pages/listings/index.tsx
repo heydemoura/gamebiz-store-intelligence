@@ -1,0 +1,264 @@
+import { Head, Link, router } from '@inertiajs/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { dashboard } from '@/routes';
+import listings from '@/routes/listings';
+import { Download, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+
+interface Listing {
+    id: number;
+    title: string;
+    game_title: string;
+    platform_label: string;
+    price_cents: number;
+    condition_label: string;
+    marketplace: string;
+    listing_url: string;
+    last_seen_at: string;
+}
+
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
+interface PaginatedListings {
+    data: Listing[];
+    links: PaginationLink[];
+    current_page: number;
+    last_page: number;
+}
+
+interface Props {
+    listings: PaginatedListings;
+    marketplaces: Array<{ id: number; name: string }>;
+    platforms: Array<{ value: string; label: string }>;
+    conditions: Array<{ value: string; label: string }>;
+    filters: {
+        search?: string;
+        marketplace?: string;
+        condition?: string;
+        platform?: string;
+        price_min?: string;
+        price_max?: string;
+    };
+}
+
+function formatPrice(cents: number): string {
+    return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+export default function ListingsIndex({
+    listings: paginatedListings,
+    marketplaces,
+    platforms,
+    conditions,
+    filters,
+}: Props) {
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [marketplace, setMarketplace] = useState(filters.marketplace ?? '');
+    const [condition, setCondition] = useState(filters.condition ?? '');
+    const [platform, setPlatform] = useState(filters.platform ?? '');
+    const [priceMin, setPriceMin] = useState(filters.price_min ?? '');
+    const [priceMax, setPriceMax] = useState(filters.price_max ?? '');
+
+    function applyFilters(newFilters: Record<string, string>) {
+        const merged = { ...filters, ...newFilters };
+        const cleaned = Object.fromEntries(
+            Object.entries(merged).filter(([, v]) => v !== '' && v !== undefined),
+        );
+        router.get(listings.index.url(), cleaned, { preserveState: true });
+    }
+
+    function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+        if (e.key === 'Enter') {
+            applyFilters({ search });
+        }
+    }
+
+    function exportUrl(): string {
+        const params = Object.fromEntries(
+            Object.entries(filters).filter(([, v]) => v !== '' && v !== undefined),
+        );
+        return listings.export.url({ query: params });
+    }
+
+    return (
+        <>
+            <Head title="Listings" />
+            <div className="flex flex-col gap-6 p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                    <Input
+                        placeholder="Search listings..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        onKeyDown={handleSearchKeyDown}
+                        className="w-64"
+                    />
+                    <Select
+                        value={marketplace}
+                        onValueChange={(value) => {
+                            setMarketplace(value);
+                            applyFilters({ marketplace: value === 'all' ? '' : value });
+                        }}
+                    >
+                        <SelectTrigger className="w-48">
+                            <SelectValue placeholder="All Marketplaces" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Marketplaces</SelectItem>
+                            {marketplaces.map((m) => (
+                                <SelectItem key={m.id} value={String(m.id)}>
+                                    {m.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select
+                        value={condition}
+                        onValueChange={(value) => {
+                            setCondition(value);
+                            applyFilters({ condition: value === 'all' ? '' : value });
+                        }}
+                    >
+                        <SelectTrigger className="w-40">
+                            <SelectValue placeholder="All Conditions" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Conditions</SelectItem>
+                            {conditions.map((c) => (
+                                <SelectItem key={c.value} value={c.value}>
+                                    {c.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select
+                        value={platform}
+                        onValueChange={(value) => {
+                            setPlatform(value);
+                            applyFilters({ platform: value === 'all' ? '' : value });
+                        }}
+                    >
+                        <SelectTrigger className="w-40">
+                            <SelectValue placeholder="All Platforms" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Platforms</SelectItem>
+                            {platforms.map((p) => (
+                                <SelectItem key={p.value} value={p.value}>
+                                    {p.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Input
+                        type="number"
+                        placeholder="Min price"
+                        value={priceMin}
+                        onChange={(e) => setPriceMin(e.target.value)}
+                        onBlur={() => applyFilters({ price_min: priceMin })}
+                        className="w-28"
+                    />
+                    <Input
+                        type="number"
+                        placeholder="Max price"
+                        value={priceMax}
+                        onChange={(e) => setPriceMax(e.target.value)}
+                        onBlur={() => applyFilters({ price_max: priceMax })}
+                        className="w-28"
+                    />
+                    <a href={exportUrl()}>
+                        <Button variant="outline" size="sm">
+                            <Download className="size-4" />
+                            Export
+                        </Button>
+                    </a>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b bg-muted/50 text-left text-muted-foreground">
+                                <th className="px-4 py-3 font-medium">Title</th>
+                                <th className="px-4 py-3 font-medium">Game</th>
+                                <th className="px-4 py-3 font-medium">Platform</th>
+                                <th className="px-4 py-3 font-medium">Price</th>
+                                <th className="px-4 py-3 font-medium">Condition</th>
+                                <th className="px-4 py-3 font-medium">Marketplace</th>
+                                <th className="px-4 py-3 font-medium">Last Seen</th>
+                                <th className="px-4 py-3 font-medium"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {paginatedListings.data.map((listing) => (
+                                <tr key={listing.id} className="border-b last:border-0">
+                                    <td className="px-4 py-3 font-medium">{listing.title}</td>
+                                    <td className="px-4 py-3">{listing.game_title}</td>
+                                    <td className="px-4 py-3">
+                                        <Badge variant="secondary">{listing.platform_label}</Badge>
+                                    </td>
+                                    <td className="px-4 py-3 font-medium">{formatPrice(listing.price_cents)}</td>
+                                    <td className="px-4 py-3">
+                                        <Badge variant="outline">{listing.condition_label}</Badge>
+                                    </td>
+                                    <td className="px-4 py-3">{listing.marketplace}</td>
+                                    <td className="px-4 py-3 text-muted-foreground">{listing.last_seen_at}</td>
+                                    <td className="px-4 py-3">
+                                        <a
+                                            href={listing.listing_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                                        >
+                                            <ExternalLink className="size-3.5" />
+                                        </a>
+                                    </td>
+                                </tr>
+                            ))}
+                            {paginatedListings.data.length === 0 && (
+                                <tr>
+                                    <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                                        No listings found.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {paginatedListings.last_page > 1 && (
+                    <div className="flex flex-wrap items-center justify-center gap-1">
+                        {paginatedListings.links.map((link, index) => (
+                            <Link
+                                key={index}
+                                href={link.url ?? '#'}
+                                className={`rounded-md px-3 py-1.5 text-sm ${
+                                    link.active
+                                        ? 'bg-primary text-primary-foreground'
+                                        : link.url
+                                          ? 'hover:bg-accent'
+                                          : 'pointer-events-none text-muted-foreground opacity-50'
+                                }`}
+                                preserveState
+                                dangerouslySetInnerHTML={{ __html: link.label }}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+        </>
+    );
+}
+
+ListingsIndex.layout = {
+    breadcrumbs: [
+        { title: 'Dashboard', href: dashboard() },
+        { title: 'Listings', href: listings.index() },
+    ],
+};
